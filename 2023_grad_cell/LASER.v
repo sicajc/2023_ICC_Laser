@@ -248,24 +248,25 @@ module LASER (
   end
 
 
-  //==============================
-  //   CIRCULAR SHIFT REGISTER X4
-  //==============================
+  //===================================
+  //   CIRCULAR SHIFT REGISTERS X4
+  //===================================
   always @(posedge CLK)
   begin
     //synopsys_translate_off
     # `C2Q;
     //synopsys_translate_on
-    if(RST)
-    begin
-      for ( depth = 0 ; depth < 4 ; depth = depth + 1)
-        for(idx = 0 ; idx < VALID_POINT_NUM_BY_FOUR ; idx = idx+1)
-        begin
-          valid_pts_X_cir_buf[idx][depth] <= 0;
-          valid_pts_Y_cir_buf[idx][depth] <= 0;
-        end
-    end
-    else if(state_RD_DATA)
+    // if(RST)
+    // begin
+    //   for ( depth = 0 ; depth < 4 ; depth = depth + 1)
+    //     for(idx = 0 ; idx < VALID_POINT_NUM_BY_FOUR ; idx = idx+1)
+    //     begin
+    //       valid_pts_X_cir_buf[idx][depth] <= 0;
+    //       valid_pts_Y_cir_buf[idx][depth] <= 0;
+    //     end
+    // end
+    // else
+    if(state_RD_DATA)
     begin
       for ( depth = 0 ; depth < 4 ; depth = depth + 1)
         for(idx = 1 ; idx < VALID_POINT_NUM_BY_FOUR ; idx = idx+1)
@@ -504,7 +505,7 @@ module LASER (
 
   always @(*)
   begin
-    curr_valid_Num_acc_wr = pt_is_in[0] + pt_is_in[1] + pt_is_in[2] +pt_is_in[3]
+    curr_valid_Num_acc_wr = (pt_is_in[0] + pt_is_in[1]) + (pt_is_in[2] +pt_is_in[3])
     + curr_valid_Num_acc_ff;
   end
 
