@@ -1,0 +1,54 @@
+Information: Updating design information... (UID-85)
+ 
+****************************************
+Report : timing
+        -path full
+        -delay max
+        -max_paths 1
+Design : Inside
+Version: N-2017.09-SP2
+Date   : Fri Mar 31 20:21:19 2023
+****************************************
+
+Operating Conditions: slow   Library: slow
+Wire Load Model Mode: top
+
+  Startpoint: circle_y[0]
+              (input port)
+  Endpoint: is_inside (output port)
+  Path Group: (none)
+  Path Type: max
+
+  Point                                                   Incr       Path
+  --------------------------------------------------------------------------
+  input external delay                                    0.00       0.00 r
+  circle_y[0] (in)                                        0.00       0.00 r
+  U32/Y (CLKINVX1)                                        0.04       0.04 f
+  U31/Y (NAND2X1)                                         0.09       0.13 r
+  U29/Y (CLKINVX1)                                        0.08       0.21 f
+  U25/Y (AO21X1)                                          0.27       0.48 f
+  U24/Y (OAI21XL)                                         0.17       0.65 r
+  U21/Y (NOR2X1)                                          0.10       0.75 f
+  U20/Y (OAI2BB2XL)                                       0.28       1.03 r
+  U18/Y (XNOR2X1)                                         0.19       1.22 r
+  mult_pow_13_2/a[3] (Inside_DW_mult_tc_3)                0.00       1.22 r
+  mult_pow_13_2/U39/Y (CLKINVX1)                          0.13       1.35 f
+  mult_pow_13_2/U19/Y (NOR2X1)                            0.10       1.45 r
+  mult_pow_13_2/U6/S (ADDFXL)                             0.65       2.10 f
+  mult_pow_13_2/product[4] (Inside_DW_mult_tc_3)          0.00       2.10 f
+  add_13/B[4] (Inside_DW01_add_0)                         0.00       2.10 f
+  add_13/U1_4/CO (ADDFXL)                                 0.64       2.74 f
+  add_13/U1_5/CO (ADDFXL)                                 0.38       3.11 f
+  add_13/U1_6/CO (ADDFXL)                                 0.38       3.49 f
+  add_13/U1_7/CO (ADDFXL)                                 0.38       3.87 f
+  add_13/U1_8/CO (ADDFXL)                                 0.38       4.25 f
+  add_13/U1_9/Y (XOR3X1)                                  0.23       4.47 f
+  add_13/SUM[9] (Inside_DW01_add_0)                       0.00       4.47 f
+  U13/Y (NOR4BX1)                                         0.13       4.60 r
+  is_inside (out)                                         0.00       4.60 r
+  data arrival time                                                  4.60
+  --------------------------------------------------------------------------
+  (Path is unconstrained)
+
+
+1

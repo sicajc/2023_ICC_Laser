@@ -1,0 +1,39 @@
+ 
+****************************************
+Report : resources
+Design : Inside
+Version: N-2017.09-SP2
+Date   : Fri Mar 31 20:21:19 2023
+****************************************
+
+Resource Sharing Report for design Inside in file
+        /home/rain/IC_contest/2023_grad_cell/2023_grad_cell/is_inside/Inside.v
+
+===============================================================================
+|          |              |            | Contained     |                      |
+| Resource | Module       | Parameters | Resources     | Contained Operations |
+===============================================================================
+| r319     | DW01_sub     | width=5    |               | sub_10               |
+| r321     | DW01_sub     | width=5    |               | sub_11               |
+| r323     | DW_mult_tc   | a_width=5  |               | mult_pow_13          |
+|          |              | b_width=5  |               |                      |
+| r325     | DW_mult_tc   | a_width=5  |               | mult_pow_13_2        |
+|          |              | b_width=5  |               |                      |
+| r327     | DW01_add     | width=10   |               | add_13               |
+| r329     | DW_cmp       | width=10   |               | lte_16               |
+===============================================================================
+
+
+Implementation Report
+===============================================================================
+|                    |                  | Current            | Set            |
+| Cell               | Module           | Implementation     | Implementation |
+===============================================================================
+| mult_pow_13_2      | DW_mult_tc       | apparch (area)     |                |
+|                    |                  | mult_arch: and     |                |
+| mult_pow_13        | DW_mult_tc       | apparch (area)     |                |
+|                    |                  | mult_arch: and     |                |
+| add_13             | DW01_add         | rpl                |                |
+===============================================================================
+
+1
