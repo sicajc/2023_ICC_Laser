@@ -1,322 +1,661 @@
+`define C2Q 0.8
 module LASER (
-input CLK,
-input RST,
-input [3:0] X,
-input [3:0] Y,
-output reg [3:0] C1X,
-output reg [3:0] C1Y,
-output reg [3:0] C2X,
-output reg [3:0] C2Y,
-output reg DONE);
+    input CLK,
+    input RST,
+    input [3:0] X,
+    input [3:0] Y,
+    output reg [3:0] C1X,
+    output reg [3:0] C1Y,
+    output reg [3:0] C2X,
+    output reg [3:0] C2Y,
+    output reg DONE);
 
-//================================================================
-//   PARAMETER
-//================================================================
+  //===============================
+  //   PARAMETER
+  //===============================
+  parameter DATA_WIDTH      = 4;
+  parameter VALID_POINT_NUM = 40;
+  parameter VALID_POINT_NUM_BY_FOUR = 10;
+  parameter ITER_NUM        = 4;
+  parameter VALID_PTS_WIDTH       = 6;
+  parameter RADIUS = 4;
 
-localparam IDLE      = 3'd0;
-localparam READ      = 3'd1;
-localparam IS_INSIDE = 3'd2;
-localparam FIND_BEST = 3'd3;
-localparam OUT       = 3'd4;
+  integer idx,depth;
+  //===============================
+  //   States
+  //===============================
+  reg[6:0] currentState, nextState;
 
-localparam OBJ_NUM  = 40;
-localparam PARALLEL = 5;
-localparam IS_INSIDE_NUM = 8; // OBJ_NUM / PARALLEL
-localparam MAX_ITER = 6;
+  localparam IDLE         = 7'b0000001;
+  localparam RD_DATA      = 7'b0000010;
+  localparam FIRST_TRY_C1 = 7'b0000100;
+  localparam FIND_C2      = 7'b0001000;
+  localparam FIND_C1      = 7'b0010000;
+  localparam EVAL         = 7'b0100000;
+  localparam FINISH         = 7'b1000000;
 
-integer i;
-genvar idx;
+  wire state_IDLE         = currentState[0];
+  wire state_RD_DATA      = currentState[1];
+  wire state_FIRST_TRY_C1 = currentState[2];
+  wire state_FIND_C2      = currentState[3];
+  wire state_FIND_C1      = currentState[4];
+  wire state_EVAL         = currentState[5];
+  wire state_DONE         = currentState[6];
 
-//================================================================
-//   REG
-//================================================================
-reg [2:0] curr_state,next_state;
-reg [5:0] global_cnt;
-reg [10:0] iter_cnt;
-reg [7:0] obj_mem[0:39];//obj_x [3:0];obj_y [7:4]
-reg [3:0] col_ptr,row_ptr;
-reg [7:0] circal_loc_C1,circal_loc_C2;
-reg [5:0] opt_num;
-reg [39:0] max_c1_dirty,max_c2_dirty,tmp_dirty ;
+  //============================
+  //  CNTS,PTRS
+  //============================
+  reg[5:0] valid_pts_cnt;
+  reg[DATA_WIDTH-1:0] row_ptr,col_ptr;
+  reg[2:0] iters_cnt ;
 
-//================================================================
-//   WIRE
-//================================================================
+  wire[1:0] rd_data_in_switch = valid_pts_cnt[1:0];
 
-reg [5:0] opt_num_w;
-reg [39:0] or_result;
+  //============================
+  //  FF & BUFFERS
+  //============================
+  reg[VALID_PTS_WIDTH-1:0] curr_valid_Num_acc_ff;
+  reg[VALID_PTS_WIDTH-1:0] best_Num_ff;
+  reg[DATA_WIDTH-1:0] bestC1X_ff,bestC1Y_ff,bestC2X_ff,bestC2Y_ff;
 
-//state indicater
-wire state_IDLE      = curr_state == IDLE;
-wire state_READ      = curr_state == READ;
-wire state_IS_INSIDE = curr_state == IS_INSIDE;
-wire state_FIND_BEST = curr_state == FIND_BEST;
-wire state_OUT       = curr_state == OUT;
+  reg[DATA_WIDTH-1:0] valid_pts_X_cir_buf[0:VALID_POINT_NUM_BY_FOUR-1][0:3];
+  reg[DATA_WIDTH-1:0] valid_pts_Y_cir_buf[0:VALID_POINT_NUM_BY_FOUR-1][0:3];
 
-//flag
-wire rd_done         = global_cnt == OBJ_NUM -1 && state_READ;
-wire IS_INSIDE_done  = global_cnt == OBJ_NUM - PARALLEL && state_IS_INSIDE;
-wire row_boundary    = row_ptr    == 'd15;
-wire col_boundary    = col_ptr    == 'd15;
-wire opt_tmp_lr_max  = opt_num_w  >= opt_num; //larger than
-wire one_iter_done   = state_FIND_BEST && row_boundary && col_boundary;
-wire FIND_BEST_done  = iter_cnt   == MAX_ITER -1 && one_iter_done;
+  //============================
+  //   WIRE
+  //============================
+  reg [VALID_PTS_WIDTH-1:0] det_inside_C1;
+  reg [VALID_PTS_WIDTH-1:0] det_inside_C2;
+  reg [VALID_PTS_WIDTH-1:0] curr_valid_Num_acc_wr;
 
-//wire 
-wire [3:0] cur_pos_X[0:PARALLEL-1];
-wire [3:0] cur_pos_Y[0:PARALLEL-1];
+  wire[3:0] pt_is_in;
 
-// I/O
-wire [PARALLEL-1:0] is_inside;
+  // Last Value of the circular buffers.
+  wire[DATA_WIDTH-1:0] current_validX1 = valid_pts_X_cir_buf[VALID_POINT_NUM_BY_FOUR-1][0];
+  wire[DATA_WIDTH-1:0] current_validY1 = valid_pts_Y_cir_buf[VALID_POINT_NUM_BY_FOUR-1][0];
 
-//================================================================
-//   assign
-//================================================================
+  wire[DATA_WIDTH-1:0] current_validX2 = valid_pts_X_cir_buf[VALID_POINT_NUM_BY_FOUR-1][1];
+  wire[DATA_WIDTH-1:0] current_validY2 = valid_pts_Y_cir_buf[VALID_POINT_NUM_BY_FOUR-1][1];
 
-generate
-	for(idx=0;idx<PARALLEL;idx=idx+1) begin
-		assign cur_pos_X[idx] = state_IS_INSIDE ? obj_mem[global_cnt+idx][3:0] : 'd0;
-		assign cur_pos_Y[idx] = state_IS_INSIDE ? obj_mem[global_cnt+idx][7:4] : 'd0;
-	end
-endgenerate
+  wire[DATA_WIDTH-1:0] current_validX3 = valid_pts_X_cir_buf[VALID_POINT_NUM_BY_FOUR-1][2];
+  wire[DATA_WIDTH-1:0] current_validY3 = valid_pts_Y_cir_buf[VALID_POINT_NUM_BY_FOUR-1][2];
 
-//================================================================
-//   FSM
-//================================================================
-always @(posedge CLK) begin
-	if(RST) begin
-		curr_state <= READ;
-	end 
-	else begin
-		curr_state <= next_state;
-	end
-end
+  wire[DATA_WIDTH-1:0] current_validX4 = valid_pts_X_cir_buf[VALID_POINT_NUM_BY_FOUR-1][3];
+  wire[DATA_WIDTH-1:0] current_validY4 = valid_pts_Y_cir_buf[VALID_POINT_NUM_BY_FOUR-1][3];
 
-always @(*) begin 
-	case (curr_state)
-		IDLE      : next_state = READ;
-		READ      : next_state = rd_done ? IS_INSIDE : READ;
-		IS_INSIDE : next_state = IS_INSIDE_done ? FIND_BEST : IS_INSIDE;
-		FIND_BEST : next_state = FIND_BEST_done ? OUT : IS_INSIDE;
-		OUT       : next_state = IDLE;
-	endcase
-end
+  //================================================================
+  //   DESIGN
+  //================================================================
+  //========================
+  //   FLAGS
+  //========================
+  wire rd_data_done_f        = valid_pts_cnt == (VALID_POINT_NUM-1) && state_RD_DATA;
 
-//================================================================
-//   I/O
-//================================================================
-generate 
-	for(idx=0;idx<PARALLEL;idx=idx+1) begin
-		Inside inst_Inside (.x(cur_pos_X[idx]), .y(cur_pos_Y[idx]), .circle_x(col_ptr), .circle_y(row_ptr), .is_inside(is_inside[idx]));
-	end
-endgenerate
 
-//================================================================
-//   OUT
-//================================================================
-always @(posedge CLK) begin 
-	if(RST) begin
-		C1X  <= 0;
-		C1Y  <= 0;
-		C2X  <= 0;
-		C2Y  <= 0;
-		DONE <= 0;
-	end 
-	else if(state_OUT)begin
-		C1X  <= circal_loc_C1[3:0];
-		C1Y  <= circal_loc_C1[7:4];
-		C2X  <= circal_loc_C2[3:0];
-		C2Y  <= circal_loc_C2[7:4];
-		DONE <= 1;
-	end
-	else begin
-		C1X  <= 0;
-		C1Y  <= 0;
-		C2X  <= 0;
-		C2Y  <= 0;
-		DONE <= 0;
-	end
-end
+  wire valid_pts_traversed_f = valid_pts_cnt == (VALID_POINT_NUM_BY_FOUR-1) &&
+       (state_FIND_C1 || state_FIND_C2 || state_FIRST_TRY_C1) ;
 
-//================================================================
-//   DESIGN
-//================================================================
+  wire first_try_done_f      = row_ptr == 15 && col_ptr == 15
+       && state_FIRST_TRY_C1 && valid_pts_traversed_f;
 
-always @(posedge CLK) begin 
-	if(RST) begin
-		global_cnt <= 'd0;
-	end 
-	else if(rd_done || IS_INSIDE_done) begin
-		global_cnt <= 'd0;
-	end
-	else if(state_IS_INSIDE) begin
-		global_cnt <= global_cnt + PARALLEL;
-	end
-	else if(state_READ) begin
-		global_cnt <= global_cnt + 'd1;
-	end
-	else if(state_IDLE) begin
-		global_cnt <= 'd0;
-	end
-end
+  wire find_C2_done_f      = row_ptr == 15 && col_ptr == 15 && state_FIND_C2;
 
-//obj_mem
-always @(posedge CLK) begin
-	if(RST) begin
-		for (i = 0; i < 40; i=i+1) begin
-		    obj_mem[i] <= 'd0;
-		end
-	end 
-	else if(state_READ)begin
-		obj_mem[global_cnt] <= {Y,X};
-	end
-end
+  wire find_C1_done_f      = row_ptr == 15 && col_ptr == 15 && state_FIND_C1;
 
-always @(posedge CLK) begin 
-	if(RST) begin
-		col_ptr <= 'd0;
-	end 
-	else if(state_FIND_BEST) begin
-		col_ptr <= col_boundary ? 'd0 : col_ptr + 'd1;
-	end
-end
+  wire value_converged_f   = curr_valid_Num_acc_ff == best_Num_ff && state_EVAL;
 
-always @(posedge CLK) begin 
-	if(RST) begin
-		row_ptr <= 'd0;
-	end 
-	else if(state_FIND_BEST) begin
-		row_ptr <= col_boundary ? (row_boundary ? 'd0 : row_ptr + 'd1) : row_ptr;
-	end
-end
+  wire iters_done_f        = iters_cnt == ITER_NUM-1;
+  //========================
+  //   FSM
+  //========================
+  always @(posedge CLK)
+  begin
+    //synopsys_translate_off
+    # `C2Q;
+    //synopsys_translate_on
+    if(RST)
+    begin
+      currentState <= RD_DATA;
+    end
+    else
+    begin
+      currentState <= nextState;
+    end
+  end
 
-always @(posedge CLK) begin 
-	if(RST) begin
-		iter_cnt <= 0;
-	end 
-	else if(one_iter_done) begin
-		iter_cnt <= iter_cnt + 'd1;
-	end
-	else if(state_IDLE) begin
-		iter_cnt <= 'd0;
-	end
-end
+  always @(*)
+  begin
+    case (currentState)
+      IDLE    :
+      begin
+        nextState            = RD_DATA;
+      end
+      RD_DATA :
+      begin
+        nextState            = rd_data_done_f   ? FIRST_TRY_C1 : RD_DATA;
+      end
+      FIRST_TRY_C1 :
+      begin
+        nextState            = first_try_done_f ? FIND_C2 : FIRST_TRY_C1;
+      end
+      FIND_C2 :
+      begin
+        nextState            = find_C2_done_f ? FIND_C1 : FIND_C2;
+      end
+      FIND_C1 :
+      begin
+        nextState            =  find_C1_done_f ? EVAL : FIND_C1;
+      end
+      EVAL    :
+      begin
+        nextState            = (iters_done_f || value_converged_f) ? FINISH:FIND_C2;
+      end
+      FINISH    :
+      begin
+        nextState            = IDLE;
+      end
+      default :
+      begin
+        nextState            = IDLE;
+      end
+    endcase
+  end
 
-always @(posedge CLK) begin 
-	if(RST) begin
-		circal_loc_C1 <= 0;
-	end 
-	else if(one_iter_done) begin
-		circal_loc_C1 <= circal_loc_C2;
-	end
-	else if(state_FIND_BEST) begin
-		circal_loc_C1 <= opt_tmp_lr_max ? {row_ptr,col_ptr} : circal_loc_C1;
-	end
-	else if(state_IDLE) begin
-		circal_loc_C1 <= 'd0;
-	end
-end
+  //========================
+  //   PTRS, CNTS
+  //========================
+  always @(posedge CLK)
+  begin
+    //synopsys_translate_off
+    # `C2Q;
+    //synopsys_translate_on
+    if(RST)
+    begin
+      row_ptr <= 0;
+      col_ptr <= 0;
+    end
+    else if(state_IDLE || currentState != nextState)
+    begin
+      row_ptr <= 0;
+      col_ptr <= 0;
+    end
+    else
+    begin
+      if(first_try_done_f || find_C1_done_f || find_C2_done_f)
+      begin
+        row_ptr  <= 0;
+        col_ptr  <= 0;
+      end
+      else
+      begin
+        row_ptr  <= (col_ptr == 15) && valid_pts_traversed_f ?
+                 row_ptr+1 : row_ptr ;
 
-always @(posedge CLK) begin 
-	if(RST) begin
-		circal_loc_C2 <= 0;
-	end 
-	else if(one_iter_done) begin
-		circal_loc_C2 <= circal_loc_C1;
-	end
-	else if(state_IDLE) begin
-		circal_loc_C2 <= 'd0;
-	end
-end
+        col_ptr  <= valid_pts_traversed_f ?
+                 ((col_ptr==15) ? 0 :col_ptr+1) : col_ptr;
+      end
+    end
+  end
 
-always @(posedge CLK) begin 
-	if(RST) begin
-		tmp_dirty <= 0;
-	end 
-	else if(state_IS_INSIDE) begin
-		tmp_dirty[PARALLEL+global_cnt-:PARALLEL] <= is_inside;
-	end
-end
+  always @(posedge CLK)
+  begin
+    //synopsys_translate_off
+    # `C2Q;
+    //synopsys_translate_on
+    if(RST)
+    begin
+      valid_pts_cnt <= 0;
+    end
+    else if(state_IDLE || currentState != nextState || valid_pts_traversed_f)
+    begin
+      valid_pts_cnt <= 0;
+    end
+    else if(state_RD_DATA)
+    begin
+      valid_pts_cnt <= valid_pts_cnt + 1;
+    end
+    else if(state_FIND_C1 || state_FIND_C2 || state_FIRST_TRY_C1)
+    begin
+      valid_pts_cnt <= valid_pts_cnt + 1;
+    end
+    else
+    begin
+      valid_pts_cnt <= valid_pts_cnt;
+    end
+  end
 
-always @(posedge CLK) begin 
-	if(RST) begin
-		max_c1_dirty <= 0;
-	end 
-	else if(one_iter_done) begin
-		max_c1_dirty <= max_c2_dirty;
-	end
-	else if(state_FIND_BEST) begin
-		max_c1_dirty <= opt_tmp_lr_max ? tmp_dirty : max_c1_dirty;
-	end
-	else if(state_IDLE) begin
-		max_c1_dirty <= 0;
-	end 
-end
+  always @(posedge CLK)
+  begin
+    //synopsys_translate_off
+    # `C2Q;
+    //synopsys_translate_on
+    if(RST)
+    begin
+      iters_cnt <= 0;
+    end
+    else if(state_IDLE)
+    begin
+      iters_cnt <= 0;
+    end
+    else if(find_C1_done_f)
+    begin
+      iters_cnt <= iters_cnt + 1;
+    end
+    else
+    begin
+      ;
+    end
+  end
 
-always @(posedge CLK) begin 
-	if(RST) begin
-		max_c2_dirty <= 0;
-	end 
-	else if(one_iter_done) begin
-		max_c2_dirty <= max_c1_dirty;
-	end
-	else if(state_IDLE) begin
-		max_c2_dirty <= 0;
-	end 
-end
 
-always @(posedge CLK) begin 
-	if(RST) begin
-		opt_num <= 0;
-	end 
-	else if(state_FIND_BEST) begin
-		opt_num <= opt_tmp_lr_max ? opt_num_w : opt_num;
-	end
-	else if(state_IDLE) begin
-		opt_num <= 0;
-	end 
-end
+  //==============================
+  //   CIRCULAR SHIFT REGISTER X4
+  //==============================
+  always @(posedge CLK)
+  begin
+    //synopsys_translate_off
+    # `C2Q;
+    //synopsys_translate_on
+    if(RST)
+    begin
+      for ( depth = 0 ; depth < 4 ; depth = depth + 1)
+        for(idx = 0 ; idx < VALID_POINT_NUM_BY_FOUR ; idx = idx+1)
+        begin
+          valid_pts_X_cir_buf[idx][depth] <= 0;
+          valid_pts_Y_cir_buf[idx][depth] <= 0;
+        end
+    end
+    else if(state_RD_DATA)
+    begin
+      for ( depth = 0 ; depth < 4 ; depth = depth + 1)
+        for(idx = 1 ; idx < VALID_POINT_NUM_BY_FOUR ; idx = idx+1)
+        begin
+          // Circulating from 1~10
+          if(rd_data_in_switch==2'b00)
+          begin
+            valid_pts_X_cir_buf[idx][depth] <= valid_pts_X_cir_buf[idx-1][depth];
+            valid_pts_Y_cir_buf[idx][depth] <= valid_pts_Y_cir_buf[idx-1][depth];
+          end
+        end
 
-always@(*)
-begin
-	or_result = max_c2_dirty | tmp_dirty ; 
-    opt_num_w = 0;  //initialize count variable
-    for(i=0;i<40;i=i+1)   //check for all the bits
-        if(or_result[i] == 1'b1)    //check if the bit is '1'
-            opt_num_w = opt_num_w + 1;    //if its one, increment the count
-end
+      // index 0, receive value
+      case(rd_data_in_switch)
+        2'b00:
+        begin
+          valid_pts_X_cir_buf[0][0] <= X;
+          valid_pts_Y_cir_buf[0][0] <= Y;
+        end
+        2'b01:
+        begin
+          valid_pts_X_cir_buf[0][1] <= X;
+          valid_pts_Y_cir_buf[0][1] <= Y;
+        end
+        2'b10:
+        begin
+          valid_pts_X_cir_buf[0][2] <= X;
+          valid_pts_Y_cir_buf[0][2] <= Y;
+        end
+        2'b11:
+        begin
+          valid_pts_X_cir_buf[0][3] <= X;
+          valid_pts_Y_cir_buf[0][3] <= Y;
+        end
+        default:
+        begin
+          valid_pts_X_cir_buf[0][0] <= 0;
+          valid_pts_Y_cir_buf[0][0] <= 0;
+        end
+      endcase
+    end
+    else if((state_FIND_C1 || state_FIRST_TRY_C1 || state_FIND_C2))
+    begin
+      //&& !valid_pts_traversed_f
+      // Keep shifting
+      for(depth = 0 ;depth < 4 ; depth= depth + 1)
+        for(idx = 1 ; idx < VALID_POINT_NUM_BY_FOUR ; idx = idx+1)
+        begin
+          valid_pts_X_cir_buf[idx][depth] <= valid_pts_X_cir_buf[idx-1][depth];
+          valid_pts_Y_cir_buf[idx][depth] <= valid_pts_Y_cir_buf[idx-1][depth];
+
+          valid_pts_X_cir_buf[0][depth] <= valid_pts_X_cir_buf[VALID_POINT_NUM_BY_FOUR-1][depth];
+          valid_pts_Y_cir_buf[0][depth] <= valid_pts_Y_cir_buf[VALID_POINT_NUM_BY_FOUR-1][depth];
+        end
+    end
+    else
+    begin
+      ;
+    end
+  end
+
+  //============================
+  //   BEST C1,C2 and BEST NUM
+  //============================
+  always @(posedge CLK)
+  begin
+    //synopsys_translate_off
+    # `C2Q;
+    //synopsys_translate_on
+    if(RST)
+    begin
+      bestC1X_ff <= 0;
+      bestC1Y_ff <= 0;
+      bestC2X_ff <= 0;
+      bestC2Y_ff <= 0;
+      best_Num_ff <= 0;
+    end
+    else if(state_IDLE)
+    begin
+      bestC1X_ff <= 0;
+      bestC1Y_ff <= 0;
+      bestC2X_ff <= 0;
+      bestC2Y_ff <= 0;
+      best_Num_ff <= 0;
+    end
+    else if(state_FIRST_TRY_C1 || state_FIND_C1)
+    begin
+      if(curr_valid_Num_acc_wr >= best_Num_ff)
+      begin
+        bestC1X_ff <= col_ptr;
+        bestC1Y_ff <= row_ptr;
+        best_Num_ff <= curr_valid_Num_acc_wr;
+      end
+      else
+      begin
+        ;
+      end
+    end
+    else if(state_FIND_C2)
+    begin
+      if(curr_valid_Num_acc_wr >= best_Num_ff)
+      begin
+        bestC2X_ff <= col_ptr;
+        bestC2Y_ff <= row_ptr;
+        best_Num_ff <= curr_valid_Num_acc_wr;
+      end
+      else
+      begin
+        ;
+      end
+    end
+    else
+    begin
+      bestC1X_ff <= bestC1X_ff;
+      bestC1Y_ff <= bestC1Y_ff;
+      bestC2X_ff <= bestC2X_ff;
+      bestC2Y_ff <= bestC2Y_ff;
+      best_Num_ff <= best_Num_ff;
+    end
+  end
+
+  //========================
+  //   I/O
+  //========================
+  always @(posedge CLK)
+  begin
+    //synopsys_translate_off
+    # `C2Q;
+    //synopsys_translate_on
+    if(RST)
+    begin
+      C1X <= 0;
+      C1Y <= 0;
+      C2X <= 0;
+      C2Y <= 0;
+      DONE <= 0;
+    end
+    else if(state_IDLE)
+    begin
+      C1X <= 0;
+      C1Y <= 0;
+      C2X <= 0;
+      C2Y <= 0;
+      DONE <= 0;
+    end
+    else if(state_DONE)
+    begin
+      C1X <= bestC1X_ff;
+      C1Y <= bestC1Y_ff;
+      C2X <= bestC2X_ff;
+      C2Y <= bestC2Y_ff;
+      DONE <= 1;
+    end
+    else
+    begin
+      ;
+    end
+  end
+
+
+  //========================
+  //   DET VALID POINTS
+  //========================
+  reg[DATA_WIDTH-1:0] C1_Xin;
+  reg[DATA_WIDTH-1:0] C1_Yin;
+
+  wire[DATA_WIDTH-1:0] C1_Xin_feed = C1_Xin;
+  wire[DATA_WIDTH-1:0] C1_Yin_feed = C1_Yin;
+
+  reg[DATA_WIDTH-1:0] C2_Xin;
+  reg[DATA_WIDTH-1:0] C2_Yin;
+
+  wire[DATA_WIDTH-1:0] C2_Xin_feed = C2_Xin;
+  wire[DATA_WIDTH-1:0] C2_Yin_feed = C2_Yin;
+
+  always @(*)
+  begin:DET_IN_INPUTS
+    if(state_FIRST_TRY_C1)
+    begin
+      C1_Xin = col_ptr;
+      C1_Yin = row_ptr;
+
+      C2_Xin = col_ptr;
+      C2_Yin = row_ptr;
+    end
+    else if(state_FIND_C1)
+    begin
+      C1_Xin = col_ptr;
+      C1_Yin = row_ptr;
+
+      C2_Xin = bestC2X_ff;
+      C2_Yin = bestC2Y_ff;
+    end
+    else if(state_FIND_C2)
+    begin
+      C1_Xin = bestC1X_ff;
+      C1_Yin = bestC1Y_ff;
+
+      C2_Xin = col_ptr;
+      C2_Yin = row_ptr;
+    end
+    else
+    begin
+      C1_Xin = 0;
+      C1_Yin = 0;
+
+      C2_Xin = 0;
+      C2_Yin = 0;
+    end
+  end
+  //========================
+  //   Valid_num_acc
+  //========================
+  always @(posedge CLK )
+  begin
+    //synopsys_translate_off
+    # `C2Q;
+    //synopsys_translate_on
+    if(RST)
+    begin
+      curr_valid_Num_acc_ff <= 0;
+    end
+    else if(state_IDLE || valid_pts_traversed_f||currentState!=nextState)
+    begin
+      curr_valid_Num_acc_ff <= 0;
+    end
+    else if(state_FIND_C1 || state_FIND_C2 || state_FIRST_TRY_C1)
+    begin
+      curr_valid_Num_acc_ff <= curr_valid_Num_acc_wr;
+    end
+    else
+    begin
+      curr_valid_Num_acc_ff <= curr_valid_Num_acc_ff;
+    end
+  end
+
+  always @(*)
+  begin
+    curr_valid_Num_acc_wr = pt_is_in[0] + pt_is_in[1] + pt_is_in[2] +pt_is_in[3]
+    + curr_valid_Num_acc_ff;
+  end
+
+  //========================
+  //   MODULES
+  //========================
+  // det_inside
+
+  det_inside
+    #(
+      .RADIUS (RADIUS )
+    )
+    u_det_inside0(
+      .circle1X (C1_Xin_feed ),
+      .circle1Y (C1_Yin_feed ),
+      .circle2X (C2_Xin_feed ),
+      .circle2Y (C2_Yin_feed ),
+      .validX   (current_validX1),
+      .validY   (current_validY1),
+      .pt_is_in (pt_is_in[0] )
+    );
+
+
+  det_inside
+    #(
+      .RADIUS (RADIUS )
+    )
+    u_det_inside1(
+      .circle1X (C1_Xin_feed ),
+      .circle1Y (C1_Yin_feed ),
+      .circle2X (C2_Xin_feed ),
+      .circle2Y (C2_Yin_feed ),
+      .validX   (current_validX2),
+      .validY   (current_validY2),
+      .pt_is_in (pt_is_in[1] )
+    );
+
+
+  det_inside
+    #(
+      .RADIUS (RADIUS )
+    )
+    u_det_inside2(
+      .circle1X (C1_Xin_feed ),
+      .circle1Y (C1_Yin_feed ),
+      .circle2X (C2_Xin_feed ),
+      .circle2Y (C2_Yin_feed ),
+      .validX   (current_validX3   ),
+      .validY   (current_validY3  ),
+      .pt_is_in (pt_is_in[2] )
+    );
+
+  det_inside
+    #(
+      .RADIUS (RADIUS )
+    )
+    u_det_inside3(
+      .circle1X (C1_Xin_feed ),
+      .circle1Y (C1_Yin_feed ),
+      .circle2X (C2_Xin_feed ),
+      .circle2Y (C2_Yin_feed ),
+      .validX   (current_validX4   ),
+      .validY   (current_validY4   ),
+      .pt_is_in (pt_is_in[3] )
+    );
 
 endmodule
 
-module Inside (
-input [3:0] x,
-input [3:0] y,
-input [3:0] circle_x,
-input [3:0] circle_y,
-output reg is_inside // 1: is inside, 0: is outside
-);
 
-wire signed [4:0]  dis_x = circle_x - x;
-wire signed [4:0]  dis_y = circle_y - y;
+module det_inside(input[3:0] circle1X,
+                    input[3:0] circle1Y,
+                    input[3:0] circle2X,
+                    input[3:0] circle2Y,
+                    input[3:0] validX,
+                    input[3:0] validY,
+                    output pt_is_in);
+  parameter RADIUS = 4;
 
-wire [4:0] abs_dis_x = dis_x[4] ? ~dis_x + 1 : dis_x;
-wire [4:0] abs_dis_y = dis_y[4] ? ~dis_y + 1 : dis_y;
+  reg det_inside_C1,det_inside_C2;
 
-wire [5:0] dis =  abs_dis_x + abs_dis_y;
+  wire signed[3:0] dispC1X = validX - circle1X;
+  reg[3:0] absDispC1X;
 
-always @(*) begin 
-	if (dis <= 4) begin
-		is_inside = 1;
-	end 
-	else if(abs_dis_x == 2 && abs_dis_y == 3) begin
-		is_inside = 1;
-	end
-	else if(abs_dis_y == 2 && abs_dis_x == 3) begin
-		is_inside = 1;
-	end
-	else begin
-		is_inside = 0;
-	end
-end
+  wire signed[3:0] dispC1Y = validY - circle1Y;
+  reg[3:0] absDispC1Y;
+
+  wire signed[3:0] dispC2X = validX - circle2X;
+  reg[3:0] absDispC2X;
+
+  wire signed[3:0] dispC2Y = validY - circle2Y;
+  reg[3:0] absDispC2Y;
+
+  always @(*)
+  begin: absoulute
+    //C1
+    if(dispC1X > 0)
+    begin
+      absDispC1X = dispC1X;
+    end
+    else
+    begin
+      absDispC1X = ~dispC1X+1;
+    end
+
+    if(dispC1Y > 0)
+    begin
+      absDispC1Y = dispC1Y;
+    end
+    else
+    begin
+      absDispC1Y = ~dispC1Y+1;
+    end
+
+    //C2
+    if(dispC2X > 0)
+    begin
+      absDispC2X = dispC2X;
+    end
+    else
+    begin
+      absDispC2X = ~dispC2X+1;
+    end
+
+    if(dispC2Y > 0)
+    begin
+      absDispC2Y = dispC2Y;
+    end
+    else
+    begin
+      absDispC2Y = ~dispC2Y+1;
+    end
+  end
+
+  always@(*)
+  begin: DET_INSIDE
+    // The point is inside if the displacement vector is (4,0) or (0,4)
+    // or All the points with displacement less than 3 in x or y
+    // except the (3,3) ones
+    det_inside_C1 = ((absDispC1X == RADIUS) && (absDispC1Y == 0))
+                  || ((absDispC1X == 0) && (absDispC1Y == RADIUS))
+                  || (((absDispC1X <= RADIUS - 1) && (absDispC1Y <= RADIUS - 1))
+
+                      && ~((absDispC1X == RADIUS - 1) && (absDispC1Y == RADIUS - 1)));
+
+    det_inside_C2 = ((absDispC2X == RADIUS) && (absDispC2Y == 0))
+                  || ((absDispC2X == 0) && (absDispC2Y == RADIUS))
+                  || (((absDispC2X <= RADIUS - 1) && (absDispC2Y <= RADIUS - 1))
+
+                      && ~((absDispC2X == RADIUS - 1) && (absDispC2Y == RADIUS - 1)));
+  end
+
+  assign pt_is_in = det_inside_C1 || det_inside_C2;
 
 endmodule

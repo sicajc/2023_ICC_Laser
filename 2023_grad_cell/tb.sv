@@ -1,9 +1,9 @@
 `timescale 1ns/10ps
-`define CYCLE      8.0  
+`define CYCLE      8.0
 `define SDFFILE    "./LASER_syn.sdf"
 `define MAX_CYCLE_PER_PATTERN  50000
-//`define USECOLOR 
-//`define P1
+//`define USECOLOR
+// `define P3
 
 
 module testfixture();
@@ -52,30 +52,30 @@ always begin #(`CYCLE/2) CLK = ~CLK; end
 //end
 
 `ifdef P1
-    string PAT [1] = {"C:/Users/User/Desktop/ic_contest_2023/2023_grad_cell/img1.pattern"};
+    string PAT [1] = {"C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/img1.pattern"};
     parameter pat_number = 1;
 `elsif P2
-    string PAT [1] = {"C:/Users/User/Desktop/ic_contest_2023/2023_grad_cell/img2.pattern"};
+    string PAT [1] = {"C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/img2.pattern"};
     parameter pat_number = 1;
 `elsif P3
-    string PAT [1] = {"C:/Users/User/Desktop/ic_contest_2023/2023_grad_cell/img3.pattern"};
+    string PAT [1] = {"C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/img3.pattern"};
     parameter pat_number = 1;
 `elsif P4
-    string PAT [1] = {"C:/Users/User/Desktop/ic_contest_2023/2023_grad_cell/img4.pattern"};
+    string PAT [1] = {"C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/img4.pattern"};
     parameter pat_number = 1;
 `elsif P5
-    string PAT [1] = {"C:/Users/User/Desktop/ic_contest_2023/2023_grad_cell/img5.pattern"};
+    string PAT [1] = {"C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/img5.pattern"};
     parameter pat_number = 1;
 `elsif P6
-    string PAT [1] = {"C:/Users/User/Desktop/ic_contest_2023/2023_grad_cell/img6.pattern"};
+    string PAT [1] = {"C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/img6.pattern"};
     parameter pat_number = 1;
 `else
-    string PAT [6] = {"C:/Users/User/Desktop/ic_contest_2023/2023_grad_cell/img1.pattern",
-    "C:/Users/User/Desktop/ic_contest_2023/2023_grad_cell/img2.pattern",
-    "C:/Users/User/Desktop/ic_contest_2023/2023_grad_cell/img3.pattern",
-    "C:/Users/User/Desktop/ic_contest_2023/2023_grad_cell/img4.pattern",
-    "C:/Users/User/Desktop/ic_contest_2023/2023_grad_cell/img5.pattern",
-    "C:/Users/User/Desktop/ic_contest_2023/2023_grad_cell/img6.pattern"};
+    string PAT [6] = {"C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/img1.pattern",
+    "C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/img2.pattern",
+    "C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/img3.pattern",
+    "C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/img4.pattern",
+    "C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/img5.pattern",
+    "C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/img6.pattern"};
     parameter pat_number = 6;
 `endif
 
@@ -156,7 +156,7 @@ always @(posedge CLK ) begin
                 #1 RST <= 1'b0;
                 rst_count <=0;
                 state <=ST_PATTERN;
-            end 
+            end
             else begin
                 #1 RST <= 1'b1;
                 rst_count <= rst_count+1;
@@ -171,7 +171,7 @@ always @(posedge CLK ) begin
             end
         end
         ST_PATTERN: begin
-            if(DONE == 0) begin 
+            if(DONE == 0) begin
                 if (pixel_count < 40) begin
                     #1;
                     pixel_count <= pixel_count +1;
@@ -204,7 +204,7 @@ always @(posedge CLK ) begin
             end
         end
         ST_RUN: begin
-            if(DONE == 0) begin 
+            if(DONE == 0) begin
                 cycle_pat<=cycle_pat+1;
                 if (cycle_pat > `MAX_CYCLE_PER_PATTERN) begin
                     $display("== PATTERN %s",PAT[pat_n]);
@@ -384,4 +384,3 @@ task draw_img;
     end
 endtask
 endmodule
-
