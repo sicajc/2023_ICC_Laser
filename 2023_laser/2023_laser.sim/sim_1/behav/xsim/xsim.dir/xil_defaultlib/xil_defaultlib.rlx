@@ -1,0 +1,7 @@
+0.7
+2020.2
+Apr 18 2022
+16:05:34
+C:/Users/User/Desktop/2023_ICC_Laser/2023_laser/2023_laser.sim/sim_1/behav/xsim/glbl.v,1649976174,verilog,,,,glbl,,uvm,,,,,,
+C:/Users/User/Desktop/2023_ICC_Laser/RTL/HDL/LASER.v,1680401253,verilog,,,,LASER;det_inside,,uvm,,,,,,
+C:/Users/User/Desktop/2023_ICC_Laser/RTL/SIM/tb.sv,1680401104,systemVerilog,,,,testfixture,,uvm,,,,,,

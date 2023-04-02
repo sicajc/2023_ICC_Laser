@@ -1,0 +1,1 @@
+Rdc_shell-t -f syn.tcl | tee ../Netlist/syn.log

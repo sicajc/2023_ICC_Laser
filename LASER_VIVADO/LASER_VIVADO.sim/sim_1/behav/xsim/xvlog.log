@@ -1,6 +1,0 @@
-INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/LASER.v" into library xil_defaultlib
-INFO: [VRFC 10-311] analyzing module LASER
-INFO: [VRFC 10-311] analyzing module det_inside
-INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/det_inside.v" into library xil_defaultlib
-INFO: [VRFC 10-311] analyzing module det_inside
-WARNING: [VRFC 10-3609] overwriting previous definition of module 'det_inside' [C:/Users/HIBIKI/Desktop/2023_univ_cell_B--main/2023_grad_cell/det_inside.v:1]

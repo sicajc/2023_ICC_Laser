@@ -1,0 +1,8 @@
+INFO: [VRFC 10-2263] Analyzing Verilog file "C:/Users/User/Desktop/2023_ICC_Laser/RTL/HDL/LASER.v" into library xil_defaultlib
+INFO: [VRFC 10-311] analyzing module LASER
+WARNING: [VRFC 10-2096] empty statement in sequential block [C:/Users/User/Desktop/2023_ICC_Laser/RTL/HDL/LASER.v:246]
+WARNING: [VRFC 10-2096] empty statement in sequential block [C:/Users/User/Desktop/2023_ICC_Laser/RTL/HDL/LASER.v:327]
+WARNING: [VRFC 10-2096] empty statement in sequential block [C:/Users/User/Desktop/2023_ICC_Laser/RTL/HDL/LASER.v:365]
+WARNING: [VRFC 10-2096] empty statement in sequential block [C:/Users/User/Desktop/2023_ICC_Laser/RTL/HDL/LASER.v:378]
+WARNING: [VRFC 10-2096] empty statement in sequential block [C:/Users/User/Desktop/2023_ICC_Laser/RTL/HDL/LASER.v:425]
+INFO: [VRFC 10-311] analyzing module det_inside
