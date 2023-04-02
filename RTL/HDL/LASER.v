@@ -1,4 +1,9 @@
 // `define C2Q 0.8
+//======================================
+//   PPA = Area * Run Cycles
+//   v1.0 4-parrallel 19080 * 17608
+//
+//======================================
 module LASER (
     input CLK,
     input RST,
@@ -506,7 +511,7 @@ module LASER (
   always @(*)
   begin
     curr_valid_Num_acc_wr = (pt_is_in[0] + pt_is_in[1]) + (pt_is_in[2] +pt_is_in[3])
-    + curr_valid_Num_acc_ff;
+                          + curr_valid_Num_acc_ff;
   end
 
   //========================
