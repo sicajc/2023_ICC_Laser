@@ -1,4 +1,4 @@
-`define C2Q 0.8
+// `define C2Q 0.8
 module LASER (
     input CLK,
     input RST,
@@ -111,7 +111,7 @@ module LASER (
   always @(posedge CLK)
   begin
     //synopsys_translate_off
-    # `C2Q;
+    // # `C2Q;
     //synopsys_translate_on
     if(RST)
     begin
@@ -167,7 +167,7 @@ module LASER (
   always @(posedge CLK)
   begin
     //synopsys_translate_off
-    # `C2Q;
+    // # `C2Q;
     //synopsys_translate_on
     if(RST)
     begin
@@ -200,7 +200,7 @@ module LASER (
   always @(posedge CLK)
   begin
     //synopsys_translate_off
-    # `C2Q;
+    // # `C2Q;
     //synopsys_translate_on
     if(RST)
     begin
@@ -227,7 +227,7 @@ module LASER (
   always @(posedge CLK)
   begin
     //synopsys_translate_off
-    # `C2Q;
+    // # `C2Q;
     //synopsys_translate_on
     if(RST)
     begin
@@ -254,7 +254,7 @@ module LASER (
   always @(posedge CLK)
   begin
     //synopsys_translate_off
-    # `C2Q;
+    // # `C2Q;
     //synopsys_translate_on
     // if(RST)
     // begin
@@ -334,7 +334,7 @@ module LASER (
   always @(posedge CLK)
   begin
     //synopsys_translate_off
-    # `C2Q;
+    // # `C2Q;
     //synopsys_translate_on
     if(RST)
     begin
@@ -394,7 +394,7 @@ module LASER (
   always @(posedge CLK)
   begin
     //synopsys_translate_off
-    # `C2Q;
+    // # `C2Q;
     //synopsys_translate_on
     if(RST)
     begin
@@ -483,7 +483,7 @@ module LASER (
   always @(posedge CLK )
   begin
     //synopsys_translate_off
-    # `C2Q;
+    // # `C2Q;
     //synopsys_translate_on
     if(RST)
     begin
